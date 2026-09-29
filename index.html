@@ -196,10 +196,11 @@
 
     .legend-item { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
     .legend-line { width: 24px; height: 4px; border-radius: 5px; background: var(--green); }
+    .legend-line.young { background: var(--young-of-link); }
+    .legend-line.related { background: var(--family-link); }
     .legend-line.retired { background: var(--retired); }
     .legend-line.popularity { height: 10px; background: linear-gradient(90deg, #111b7a, #00dc4b); }
     .legend-line.no-popularity { height: 10px; background: repeating-linear-gradient(135deg, #d9ded9 0 5px, #aeb6af 5px 10px); }
-    .legend-card { width: 13px; height: 18px; border: 1px solid #aeb9ae; border-radius: 2px; background: #e7ece6; }
     .legend-today { width: 2px; height: 18px; background: var(--today-line); }
 
     .range-note {
@@ -215,7 +216,7 @@
     .range-note strong { color: #435148; font-weight: 700; }
 
     .class-section { margin-top: 7px; border-top: 1px solid #cad4ca; }
-    .class-scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-color: #aab8aa #e6ebe4; }
+    .class-scroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-color: #aab8aa #e6ebe4; }
 
     .timeline-head, .hero-row {
       display: grid;
@@ -336,6 +337,9 @@
       isolation: isolate;
     }
 
+    .hero-row.search-match .hero-label,
+    .hero-row.search-match .plot { background: #fff3c4; }
+
     .plot::after {
       position: absolute;
       z-index: 0;
@@ -426,6 +430,7 @@
       position: absolute;
       z-index: 5;
       display: block;
+      appearance: none;
       top: 6px;
       width: 64px;
       height: 90px;
@@ -437,6 +442,7 @@
       transform: translateX(-50%);
       padding: 0;
       cursor: pointer;
+      font: inherit;
       text-decoration: none;
     }
 
@@ -459,7 +465,14 @@
     .card-preview-image-link { display: block; }
     .card-preview img { display: block; width: 100%; aspect-ratio: .72; max-height: min(626px, calc(100vh - 120px)); object-fit: contain; background: #e8ece7; }
     .preview-copy { display: grid; gap: 5px; padding: 10px 12px 12px; }
-    .preview-copy strong { color: #26332b; font-size: 12px; line-height: 1.35; }
+    .preview-copy a {
+      color: #135e9e;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.35;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
     .preview-copy span { color: #68746d; font-family: "DM Mono", Consolas, monospace; font-size: 10px; line-height: 1.4; }
 
     .empty-state {
@@ -529,7 +542,28 @@
       main { padding: 16px 14px 36px; }
       .legend { flex: 1 0 100%; margin-left: 0; }
       .range-note { align-items: start; flex-direction: column; }
-      :root { --rail-width: 220px; --plot-width: 760px; }
+      :root { --plot-width: 760px; }
+      .timeline-head {
+        grid-template-columns: minmax(var(--plot-width), 1fr);
+        grid-template-rows: 28px 58px;
+        height: 86px;
+        min-width: var(--plot-width);
+      }
+      .hero-row {
+        grid-template-columns: minmax(var(--plot-width), 1fr);
+        min-width: var(--plot-width);
+      }
+      .class-title {
+        display: flex;
+        grid-column: 1;
+        grid-row: 1;
+        width: max-content;
+        max-width: 100%;
+        padding: 2px 8px 2px 2px;
+      }
+      .hero-label { display: none; }
+      .year-axis { grid-column: 1; grid-row: 2; }
+      .plot { grid-column: 1; }
       .class-title h2 { font-size: 14px; }
     }
 
@@ -565,10 +599,10 @@
       </label>
       <div class="legend" aria-label="Timeline legend">
         <span class="legend-item"><i class="legend-line popularity"></i>Popularity</span>
-        <span class="legend-item"><i class="legend-line retired"></i>Retired</span>
         <span class="legend-item"><i class="legend-line no-popularity"></i>No data</span>
-        <span class="legend-item"><i class="legend-card"></i>First release</span>
-        <span class="legend-item"><i class="legend-today"></i>Today</span>
+        <span class="legend-item"><i class="legend-line young"></i>Young</span>
+        <span class="legend-item"><i class="legend-line related"></i>Related</span>
+        <span class="legend-item"><i class="legend-today"></i>Now</span>
       </div>
     </div>
 
@@ -579,7 +613,7 @@
         <img id="preview-image" alt="">
       </a>
       <div class="preview-copy">
-        <strong id="preview-name"></strong>
+        <a id="preview-name" target="_blank" rel="noopener noreferrer"></a>
         <span id="preview-date"></span>
         <span id="preview-duration"></span>
         <span id="preview-set"></span>
@@ -627,6 +661,7 @@
       let ticks = [];
       let previewHideTimer;
       let activePreviewHeroId = null;
+      let syncingTimelineScroll = false;
 
       function loadPopularity(format, path, version) {
         const url = new URL(path, "https://content.fabrary.net");
@@ -766,11 +801,14 @@
       function showPreview(hero, marker) {
         window.clearTimeout(previewHideTimer);
         activePreviewHeroId = hero.id;
-        previewCardLink.href = hero.card_url || `https://cardvault.fabtcg.com/card/${encodeURIComponent(hero.id)}`;
+        const cardUrl = hero.card_url || `https://cardvault.fabtcg.com/card/${encodeURIComponent(hero.id)}`;
+        previewCardLink.href = cardUrl;
         previewCardLink.setAttribute("aria-label", `Open ${hero.name} card on CardVault in a new tab`);
         previewImage.src = marker.querySelector("img")?.currentSrc || hero.images?.small || hero.images?.normal || hero.images?.large || "";
         previewImage.alt = `${hero.name} card`;
         previewName.textContent = hero.name;
+        previewName.href = cardUrl;
+        previewName.setAttribute("aria-label", `Open ${hero.name} card on CardVault in a new tab`);
         const release = toDay(hero.first_release_date);
         const dateDetails = [release === null ? "First release: Date unavailable" : `First release: ${formatDate(release)}`];
         const retirement = toDay(hero.retirement_date);
@@ -796,16 +834,39 @@
         });
       }
 
-      function hidePreview() {
-        previewHideTimer = window.setTimeout(() => {
-          cardPreview.classList.remove("is-visible");
-          cardPreview.setAttribute("aria-hidden", "true");
-          activePreviewHeroId = null;
-        }, 120);
+      function isMobileMode() {
+        return window.matchMedia("(max-width: 760px)").matches;
       }
 
-      cardPreview.addEventListener("pointerenter", () => window.clearTimeout(previewHideTimer));
+      function closePreview() {
+        window.clearTimeout(previewHideTimer);
+        cardPreview.classList.remove("is-visible");
+        cardPreview.setAttribute("aria-hidden", "true");
+        activePreviewHeroId = null;
+      }
+
+      function hidePreview() {
+        if (isMobileMode()) return;
+        previewHideTimer = window.setTimeout(closePreview, 120);
+      }
+
+      cardPreview.addEventListener("pointerenter", () => {
+        if (!isMobileMode()) window.clearTimeout(previewHideTimer);
+      });
       cardPreview.addEventListener("pointerleave", hidePreview);
+      cardPreview.addEventListener("click", (event) => {
+        if (!isMobileMode()) return;
+        if (previewCardLink.contains(event.target)) {
+          event.preventDefault();
+          closePreview();
+          return;
+        }
+        if (previewName.contains(event.target)) {
+          window.setTimeout(closePreview, 0);
+          return;
+        }
+        closePreview();
+      });
 
       function addTick(container, tick, axis) {
         const line = document.createElement("i");
@@ -844,10 +905,6 @@
 
         const axis = document.createElement("div");
         axis.className = "year-axis";
-        const axisName = document.createElement("span");
-        axisName.className = "axis-label";
-        axisName.textContent = "First release · activity";
-        axis.append(axisName);
         ticks.forEach((tick) => addTick(axis, tick, true));
         addTodayMarker(axis, true);
         heading.append(title, axis);
@@ -926,18 +983,25 @@
           plot.append(activityLabel);
         }
 
-        const marker = document.createElement("a");
+        const marker = document.createElement("button");
+        marker.type = "button";
         marker.className = "card-marker";
-        marker.href = cardUrl;
-        marker.target = "_blank";
-        marker.rel = "noopener noreferrer";
         marker.style.left = `${Math.max(1.9, Math.min(98.1, percent(release)))}%`;
         marker.title = `${hero.name} · first released ${formatDate(release)} · ${hero.set.name}`;
-        marker.setAttribute("aria-label", `${hero.name}, released ${formatDate(release)}, ${hero.set.name}; open on CardVault in a new tab`);
-        marker.addEventListener("pointerenter", () => showPreview(hero, marker));
+        marker.setAttribute("aria-label", `${hero.name}, released ${formatDate(release)}, ${hero.set.name}; card preview`);
+        marker.addEventListener("pointerenter", () => {
+          if (!isMobileMode()) showPreview(hero, marker);
+        });
         marker.addEventListener("pointerleave", hidePreview);
-        marker.addEventListener("focus", () => showPreview(hero, marker));
+        marker.addEventListener("focus", () => {
+          if (!isMobileMode()) showPreview(hero, marker);
+        });
         marker.addEventListener("blur", hidePreview);
+        marker.addEventListener("click", () => {
+          if (!isMobileMode()) return;
+          if (activePreviewHeroId === hero.id && cardPreview.classList.contains("is-visible")) closePreview();
+          else showPreview(hero, marker);
+        });
         const image = document.createElement("img");
         image.src = hero.images?.small || "";
         image.alt = `${hero.name} card`;
@@ -959,6 +1023,15 @@
             label.classList.add("align-left");
           }
         });
+      }
+
+      function syncTimelineScroll(source) {
+        if (syncingTimelineScroll) return;
+        syncingTimelineScroll = true;
+        timeline.querySelectorAll(".class-scroll").forEach((scroll) => {
+          if (scroll !== source) scroll.scrollLeft = source.scrollLeft;
+        });
+        requestAnimationFrame(() => { syncingTimelineScroll = false; });
       }
 
       function familyOrdered(members) {
@@ -1043,8 +1116,7 @@
       }
 
       function searchMatches(hero, query) {
-        const haystack = [hero.name, hero.id, hero.group, hero.set?.name, ...(hero.classes || [])].join(" ").toLocaleLowerCase();
-        return haystack.includes(query);
+        return hero.name.toLocaleLowerCase().includes(query);
       }
 
       function heroesForClass(className) {
@@ -1086,12 +1158,14 @@
           section.setAttribute("aria-label", `${sectionName} heroes`);
           const scroll = document.createElement("div");
           scroll.className = "class-scroll";
+          scroll.addEventListener("scroll", () => syncTimelineScroll(scroll), { passive: true });
           scroll.append(makeSectionHeading(sectionName, visible.length));
           familyOrdered(visible).forEach((unit) => {
             const rowsById = new Map();
             unit.rows.forEach((hero) => {
               const row = makeHeroRow(hero);
               if (!row) return;
+              if (query && searchMatches(hero, query)) row.classList.add("search-match");
               rowsById.set(hero.id, row);
               scroll.append(row);
             });
