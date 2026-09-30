@@ -880,6 +880,12 @@
         }
         closePreview();
       });
+      document.addEventListener("click", (event) => {
+        if (!cardPreview.classList.contains("is-visible")) return;
+        const target = event.target;
+        if (!(target instanceof Element) || cardPreview.contains(target) || target.closest(".card-marker")) return;
+        closePreview();
+      });
 
       function addTick(container, tick, axis) {
         const line = document.createElement("i");
