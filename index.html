@@ -195,6 +195,18 @@
     }
 
     .legend-item { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+    .legend-copy {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1px;
+      line-height: 1.2;
+    }
+    .legend-copy a {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
     .legend-line { width: 24px; height: 4px; border-radius: 5px; background: var(--green); }
     .legend-line.young { background: var(--young-of-link); }
     .legend-line.related { background: var(--family-link); }
@@ -215,8 +227,8 @@
 
     .range-note strong { color: #435148; font-weight: 700; }
 
-    .class-section { margin-top: 7px; border-top: 1px solid #cad4ca; }
     .class-scroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-color: #aab8aa #e6ebe4; }
+    .class-section { margin-top: 7px; }
 
     .timeline-head, .hero-row {
       display: grid;
@@ -477,7 +489,6 @@
 
     .empty-state {
       padding: 45px 20px;
-      border-top: 1px solid var(--line);
       color: var(--muted);
       text-align: center;
       font-size: 13px;
@@ -542,6 +553,8 @@
       main { padding: 16px 14px 36px; }
       .legend { flex: 1 0 100%; margin-left: 0; }
       .range-note { align-items: start; flex-direction: column; }
+      #timeline { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-color: #aab8aa #e6ebe4; }
+      .class-scroll { overflow: visible; }
       :root { --plot-width: 760px; }
       .timeline-head {
         grid-template-columns: minmax(var(--plot-width), 1fr);
@@ -554,6 +567,7 @@
         min-width: var(--plot-width);
       }
       .class-title {
+        position: static;
         display: flex;
         grid-column: 1;
         grid-row: 1;
@@ -576,10 +590,9 @@
 <body>
   <header class="masthead">
     <div class="masthead-inner">
-      <p class="eyebrow">Flesh and Blood · Hero archive</p>
-      <h1>Flesh and Blood Heroes Release Timeline</h1>
+      <h1>Flesh and Blood Heroes</h1>
       <div class="masthead-bottom">
-        <p>A class-by-class view of first releases and hero lifespans.</p>
+        <p>A timeline of all released heroes and their connections, grouped by class.</p>
         <div class="stats" id="stats" aria-live="polite"></div>
       </div>
     </div>
@@ -598,7 +611,7 @@
         </select>
       </label>
       <div class="legend" aria-label="Timeline legend">
-        <span class="legend-item"><i class="legend-line popularity"></i>Popularity</span>
+        <span class="legend-item"><i class="legend-line popularity"></i><span class="legend-copy"><span>Popularity last 30 days</span><a href="https://fabrary.net" target="_blank" rel="noopener noreferrer">Fabrary.net</a></span></span>
         <span class="legend-item"><i class="legend-line no-popularity"></i>No data</span>
         <span class="legend-item"><i class="legend-line young"></i>Young</span>
         <span class="legend-item"><i class="legend-line related"></i>Related</span>
@@ -625,8 +638,8 @@
         <h2>Acknowledgements</h2>
         <ul>
           <li>"Flesh and Blood Heroes Release Timeline" is in no way affiliated with Legend Story Studios. Flesh and Blood™, and set names are trademarks of Legend Story Studios®. Characters and names may be protected by copyright.</li>
-          <li>Popularity data collected from the excellent <a href="https://fabrary.net" target="_blank" rel="noopener noreferrer">Fabrary.net</a> (fetched <time id="popularity-source-time">loading...</time>)</li>
-          <li>Co-authored by GitHub Copilot.</li>
+          <li>Popularity data collected from the excellent <a href="https://fabrary.net" target="_blank" rel="noopener noreferrer">Fabrary.net</a> (fetched <time id="popularity-source-time">loading...</time>).</li>
+          <li>Co-authored with GitHub Copilot (<a href="https://github.com/3enoit3/fab_heroes" target="_blank" rel="noopener noreferrer">github repository</a>).</li>
         </ul>
       </div>
     </footer>
@@ -824,7 +837,7 @@
         if (popularity) {
           const formatName = { CC: "Classic Constructed", SAGE: "Silver Age" }[popularity.format] || popularity.format;
           const winRate = popularity.winRate === null ? "n/a" : `${(popularity.winRate * 100).toFixed(1)}%`;
-          previewPopularity.textContent = `${formatName} ${(popularity.gameshare * 100).toFixed(1)}% · ${popularity.plays.toLocaleString()} plays · #${popularity.rank}/${popularity.total} · WR ${winRate}`;
+          previewPopularity.textContent = `${formatName} ${(popularity.gameshare * 100).toFixed(1)}% · ${popularity.plays.toLocaleString()} plays · #${popularity.rank}/${popularity.total} · Win Rate ${winRate}`;
         }
         cardPreview.classList.add("is-visible");
         cardPreview.setAttribute("aria-hidden", "false");
@@ -963,7 +976,7 @@
         if (retired) {
           activityLabel = document.createElement("span");
           activityLabel.className = "activity-label retired-label";
-          activityLabel.textContent = "Living Legend";
+          activityLabel.textContent = "Living Legends";
           activityLabel.setAttribute("aria-hidden", "true");
           bar.title = `Retired ${formatDate(end)}${barPopularity ? ` · ${barPopularity.plays.toLocaleString()} plays` : ""}`;
         } else if (barPopularity) {
@@ -987,7 +1000,6 @@
         marker.type = "button";
         marker.className = "card-marker";
         marker.style.left = `${Math.max(1.9, Math.min(98.1, percent(release)))}%`;
-        marker.title = `${hero.name} · first released ${formatDate(release)} · ${hero.set.name}`;
         marker.setAttribute("aria-label", `${hero.name}, released ${formatDate(release)}, ${hero.set.name}; card preview`);
         marker.addEventListener("pointerenter", () => {
           if (!isMobileMode()) showPreview(hero, marker);
@@ -1094,15 +1106,20 @@
             const young = byId.get(youngId);
             const youngIsHigher = rowIndexes.get(youngId) < rowIndexes.get(adult.id);
             return {
-              sourceId: youngIsHigher ? adult.id : young.id,
-              targetId: youngIsHigher ? young.id : adult.id,
+              sourceId: youngIsHigher ? young.id : adult.id,
+              targetId: youngIsHigher ? adult.id : young.id,
               type: "young_of",
             };
           });
-          const youngOfSources = new Set(youngOfLinks.map((link) => link.sourceId));
-          const groupLinks = rows.flatMap((hero) => hero.id === oldest.id || youngOfSources.has(hero.id)
-            ? []
-            : [{ sourceId: hero.id, targetId: oldest.id, type: "group" }]);
+          const redLowerIds = new Set(youngOfLinks.map(({ sourceId, targetId }) => {
+            const sourceIndex = rowIndexes.get(sourceId);
+            const targetIndex = rowIndexes.get(targetId);
+            return sourceIndex > targetIndex ? sourceId : targetId;
+          }));
+          const groupAnchorId = rows[0]?.id ?? oldest.id;
+          const groupLinks = rows.slice(1)
+            .filter((hero) => !redLowerIds.has(hero.id))
+            .map((hero) => ({ sourceId: groupAnchorId, targetId: hero.id, type: "group" }));
           const links = [...youngOfLinks, ...groupLinks];
           units.push({ date: toDay(oldest.first_release_date), name: oldest.name, rows, links });
           rows.forEach((hero) => used.add(hero.id));
@@ -1180,35 +1197,33 @@
             childrenByTarget.forEach(({ sourceIds, targetId, type }) => {
               const targetIndex = rowIndexes.get(targetId);
               if (targetIndex === undefined) return;
-              const childIndexes = sourceIds.map((id) => rowIndexes.get(id)).filter(Number.isInteger);
-              if (!childIndexes.length) return;
-              const firstIndex = Math.min(targetIndex, ...childIndexes);
-              const lastIndex = Math.max(targetIndex, ...childIndexes);
               const target = unit.rows[targetIndex];
               const targetPercent = percent(toDay(target.first_release_date));
-
-              for (let index = firstIndex; index <= lastIndex; index += 1) {
-                const plot = rowsById.get(unit.rows[index].id)?.querySelector(".plot");
-                if (!plot) continue;
-                const trunk = document.createElement("span");
-                trunk.className = `family-trunk${type === "young_of" ? " young-of" : ""}`;
-                trunk.style.left = `${targetPercent}%`;
-                trunk.style.top = index === firstIndex ? "50%" : "0";
-                trunk.style.bottom = index === lastIndex ? "50%" : "0";
-                plot.append(trunk);
-              }
 
               sourceIds.forEach((sourceId) => {
                 const sourceIndex = rowIndexes.get(sourceId);
                 const source = unit.rows[sourceIndex];
-                const plot = rowsById.get(sourceId)?.querySelector(".plot");
-                if (!source || !plot) return;
+                const sourcePlot = rowsById.get(sourceId)?.querySelector(".plot");
+                if (sourceIndex === undefined || !source || !sourcePlot) return;
                 const sourcePercent = percent(toDay(source.first_release_date));
+                const firstIndex = Math.min(sourceIndex, targetIndex);
+                const lastIndex = Math.max(sourceIndex, targetIndex);
+                for (let index = firstIndex; index <= lastIndex; index += 1) {
+                  const plot = rowsById.get(unit.rows[index].id)?.querySelector(".plot");
+                  if (!plot) continue;
+                  const trunk = document.createElement("span");
+                  trunk.className = `family-trunk${type === "young_of" ? " young-of" : ""}`;
+                  trunk.style.left = `${sourcePercent}%`;
+                  trunk.style.top = index === sourceIndex ? "50%" : "0";
+                  trunk.style.bottom = index === targetIndex ? "50%" : "0";
+                  plot.append(trunk);
+                }
+
                 const branch = document.createElement("span");
                 branch.className = `family-branch${type === "young_of" ? " young-of" : ""}`;
                 branch.style.left = `${Math.min(targetPercent, sourcePercent)}%`;
                 branch.style.width = `${Math.abs(targetPercent - sourcePercent)}%`;
-                plot.append(branch);
+                rowsById.get(targetId)?.querySelector(".plot")?.append(branch);
               });
             });
           });
@@ -1247,7 +1262,7 @@
           minDate = Date.UTC(new Date().getUTCFullYear(), 0, 1);
           maxDate = Date.UTC(new Date().getUTCFullYear() + 1, 0, 1);
           ticks = [];
-          stats.innerHTML = '<span class="stat"><strong>0</strong>heroes</span><span class="stat"><strong>0</strong>classes</span><span class="stat"><strong>0</strong>retired</span>';
+          stats.innerHTML = '<span class="stat"><strong>0</strong>heroes</span><span class="stat"><strong>0</strong>classes</span><span class="stat"><strong>0</strong>living legends</span>';
           render();
           return;
         }
@@ -1280,7 +1295,7 @@
         }
 
         const retiredCount = heroes.filter((hero) => hero.retirement_date).length;
-        stats.innerHTML = `<span class="stat"><strong>${heroes.length}</strong>heroes</span><span class="stat"><strong>${classes.length}</strong>classes</span><span class="stat"><strong>${retiredCount}</strong>retired</span>`;
+        stats.innerHTML = `<span class="stat"><strong>${heroes.length}</strong>heroes</span><span class="stat"><strong>${classes.length}</strong>classes</span><span class="stat"><strong>${retiredCount}</strong>living legends</span>`;
         search.addEventListener("input", render);
         classFilter.addEventListener("change", render);
         window.addEventListener("resize", () => {
@@ -1315,7 +1330,7 @@
         .catch((error) => {
           const message = document.createElement("div");
           message.className = "load-error";
-          message.textContent = `${error.message} Check the GitHub-hosted hero data URL and run this page through a local web server if needed.`;
+          message.textContent = `${error.message} Unable to load hero data.`;
           timeline.replaceChildren(message);
         });
     })();
